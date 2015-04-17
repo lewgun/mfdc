@@ -17,24 +17,24 @@ func mgoFlags() []cli.Flag {
 	return []cli.Flag{
 		cli.StringFlag{
 			Name:  "mip",
-			Value: "125.64.93.83",
+			Value: "",
 			Usage: "MongoDB's ip",
 			//EnvVar: "LEGACY_COMPAT_LANG,APP_LANG,LANG",
 		},
 		cli.StringFlag{
 			Name:  "mport",
-			Value: "27017",
+			Value: "",
 			Usage: "MongoDB's port",
 		},
 
 		cli.StringFlag{
 			Name:  "muser",
-			Value: "root",
+			Value: "",
 			Usage: "MongoDB's user",
 		},
 		cli.StringFlag{
 			Name:  "mpass",
-			Value: "root",
+			Value: "",
 			Usage: "MongoDB's password",
 		},
 
@@ -52,24 +52,24 @@ func mysqlFlags() []cli.Flag {
 	return []cli.Flag{
 		cli.StringFlag{
 			Name:  "ip",
-			Value: "125.64.93.83",
+			Value: "",
 			Usage: "MySQL's ip",
 			//EnvVar: "LEGACY_COMPAT_LANG,APP_LANG,LANG",
 		},
 		cli.StringFlag{
 			Name:  "port",
-			Value: "3306",
+			Value: "",
 			Usage: "MySQL's port",
 		},
 
 		cli.StringFlag{
 			Name:  "user",
-			Value: "root",
+			Value: "",
 			Usage: "MySQL's user",
 		},
 		cli.StringFlag{
 			Name:  "pass",
-			Value: "newpassword",
+			Value: "",
 			Usage: "MySQL's password",
 		},
 
