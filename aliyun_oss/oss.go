@@ -41,19 +41,19 @@ func unused(u ...interface{}) {
 }
 
 //OSS is the data struct for operate aliyun oss
-type OSS struct {
+type AliYun struct {
 	ali *alioss.OSS
 }
 
 //New new a OSS instance.
-func New(endport, key, secret string) *OSS {
-	return &OSS{
+func New(endport, key, secret string) *AliYun {
+	return &AliYun{
 		ali: alioss.New(endport, key, secret),
 	}
 }
 
 //CreateBucket create a bucket with name and perm.
-func (oss *OSS) CreateBucket(name string, perm alioss.ACL) error {
+func (oss *AliYun) CreateBucket(name string, perm alioss.ACL) error {
 	b := alioss.Bucket{
 		OSS:  oss.ali,
 		Name: name,
@@ -62,12 +62,12 @@ func (oss *OSS) CreateBucket(name string, perm alioss.ACL) error {
 }
 
 // Bucket returns a Bucket with the given name.
-func (oss *OSS) Bucket(name string) *alioss.Bucket {
+func (oss *AliYun) Bucket(name string) *alioss.Bucket {
 	return oss.ali.Bucket(name)
 }
 
 // updateMeta 上传meta信息
-func (oss *OSS) uploadMeta(uuid, name string) (string, error) {
+func (oss *AliYun) uploadMeta(uuid, name string) (string, error) {
 
 	bucket := oss.ali.Bucket(MFSDKMetaBucket)
 
@@ -81,7 +81,7 @@ func (oss *OSS) uploadMeta(uuid, name string) (string, error) {
 }
 
 //updateBinary 上传2进制文件
-func (oss *OSS) UploadBinary(path string) (string, error) {
+func (oss *AliYun) UploadBinary(path string) (string, error) {
 
 	bucket := oss.ali.Bucket(MFSDKBinariesBucket)
 
@@ -118,7 +118,7 @@ func (oss *OSS) UploadBinary(path string) (string, error) {
 }
 
 //ListBucket list all file in the bucket.
-func (oss *OSS) ListBucket(name string) {
+func (oss *AliYun) ListBucket(name string) {
 
 	b := oss.Bucket(name)
 	results, err := b.List("", "", "", 200)
@@ -134,8 +134,9 @@ func (oss *OSS) ListBucket(name string) {
 
 }
 
-//Upload upload a file.
-func (oss *OSS) Upload(path string) (metaURL, binURL string, err error) {
+//Import import a file.
+// just for importer.
+func (oss *AliYun) Import(path string) (metaURL, binURL string, err error) {
 
 	base := filepath.Base(path)
 	fields := strings.SplitN(base, "_", 2)
@@ -151,14 +152,14 @@ func (oss *OSS) Upload(path string) (metaURL, binURL string, err error) {
 }
 
 //DeleteBucket delete the bucket with name.
-func (oss *OSS) DeleteBucket(name string) error {
+func (oss *AliYun) DeleteBucket(name string) error {
 
 	bucket := oss.ali.Bucket(name)
 	return bucket.DelBucket()
 }
 
 // Delete delete a signed apk/ipa.
-func (oss *OSS) DeleteFile(uuid string) error {
+func (oss *AliYun) DeleteFile(uuid string) error {
 
 	//delete meta
 	bucket := oss.ali.Bucket(MFSDKMetaBucket)
@@ -170,7 +171,7 @@ func (oss *OSS) DeleteFile(uuid string) error {
 }
 
 //BinaryName return the binary name.
-func (oss *OSS) FileName(uuid string) string {
+func (oss *AliYun) FileName(uuid string) string {
 
 	bucket := oss.ali.Bucket(MFSDKMetaBucket)
 
@@ -185,14 +186,14 @@ func (oss *OSS) FileName(uuid string) string {
 }
 
 //OpenFile open file for read. please close it by yourself.
-func (oss *OSS) OpenFile(uuid string) (io.ReadCloser, error) {
+func (oss *AliYun) OpenFile(uuid string) (io.ReadCloser, error) {
 	bucket := oss.ali.Bucket(MFSDKBinariesBucket)
 	return bucket.GetReader(uuid)
 
 }
 
 //WriteFile save apk&ipa to oss.
-func (oss *OSS) WriteFile(name string, src multipart.File, size int) (string, error) {
+func (oss *AliYun) WriteFile(name string, src multipart.File, size int) (string, error) {
 
 	uuid := uuid.New()
 
@@ -218,4 +219,35 @@ func (oss *OSS) WriteFile(name string, src multipart.File, size int) (string, er
 
 	return uuid, nil
 
+}
+
+func (oss *AliYun) UploadFile(name string, src *os.File) (string, error) {
+	if name == "" || src == nil {
+		return "", fmt.Errorf("Illegal parameter.")
+	}
+
+	uuid := uuid.New()
+
+	bucket := oss.Bucket(MFSDKBinariesBucket)
+
+	multi, err := bucket.InitMulti(uuid, "application/octet-stream", alioss.PublicRead)
+
+	stats, err := src.Stat()
+
+	parts, err := multi.PutAll(src, stats.Size())
+	if err != nil {
+		return "", err
+	}
+
+	if err = multi.Complete(parts); err != nil {
+		return "", err
+	}
+
+	_, err = oss.uploadMeta(uuid, name)
+	if err != nil {
+		oss.DeleteFile(uuid)
+		return "", err
+	}
+
+	return uuid, nil
 }
