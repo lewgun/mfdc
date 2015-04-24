@@ -17,9 +17,11 @@
       <root url="file://$PROJECT_DIR$/../../spf13" />
       <root url="file://$PROJECT_DIR$/../../zeebo" />
       <root url="file://$PROJECT_DIR$/../../golang" />
+      <root url="file://$PROJECT_DIR$/../../google" />
       <root url="file://$PROJECT_DIR$/../dht" />
-      <root url="file://$PROJECT_DIR$/../gxui" />
+      <root url="file://$PROJECT_DIR$/../cxui" />
       <root url="file://$PROJECT_DIR$/../zturn" />
+      <root url="file://$PROJECT_DIR$/../mobile" />
       <root url="file://$PROJECT_DIR$/../toolkits" />
       <root url="file://$PROJECT_DIR$/../mfdc - 副本" />
       <root url="file://$PROJECT_DIR$/../DhtCrawler" />

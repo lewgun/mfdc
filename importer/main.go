@@ -15,7 +15,7 @@ const (
 	interval = 5
 )
 
-func upload(o *oss.OSS, files []string) {
+func upload(o *oss.AliYun, files []string) {
 
 	count := len(files)
 
@@ -32,7 +32,7 @@ func upload(o *oss.OSS, files []string) {
 
 	for i := 0; i < cnt; i++ {
 		wg.Add(1)
-		go func(start, end int, o *oss.OSS) {
+		go func(start, end int, o *oss.AliYun) {
 			defer wg.Done()
 
 			if end > count {
@@ -41,7 +41,7 @@ func upload(o *oss.OSS, files []string) {
 
 			for j := start; j != end; j++ {
 				path := files[j]
-				metaURL, binURL, err := o.Upload(path)
+				metaURL, binURL, err := o.Import(path)
 				if err != nil {
 					fmt.Printf("\nUpload file: %s failed with error: %s\n", path, err)
 
@@ -81,7 +81,7 @@ func listDir(root string) []string {
 }
 
 //makeBuckets make the binary & meta bucket
-func makeBuckets(o *oss.OSS) error {
+func makeBuckets(o *oss.AliYun) error {
 
 	var err error
 
