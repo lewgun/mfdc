@@ -93,15 +93,26 @@ func makeBuckets(o *oss.AliYun) error {
 
 }
 
+//emptyBuckets empty buckets
+func emptyBuckets(o *oss.AliYun) error {
+
+	o.DeleteBucket(oss.MFSDKBinariesBucket)
+	o.DeleteBucket(oss.MFSDKMetaBucket)
+	return makeBuckets(o)
+}
+
 func action() func(c *cli.Context) {
 	return func(ctx *cli.Context) {
 
 		o := oss.New(oss.EndpointBeiJing, ctx.String("keyId"), ctx.String("keySecret"))
 
-		err := makeBuckets(o)
-		if err != nil {
-			fmt.Printf("Make bucket failed with error: %v\n", err)
-			return
+		if ctx.String("empty") == "t" {
+			err := makeBuckets(o)
+			if err != nil {
+				fmt.Printf("Make bucket failed with error: %v\n", err)
+				return
+			}
+
 		}
 
 		files := listDir(ctx.String("loc"))
@@ -117,6 +128,12 @@ func flags() []cli.Flag {
 			Name:  "loc",
 			Value: "D:/testexport/",
 			Usage: "The location of the imported data",
+		},
+
+		cli.StringFlag{
+			Name:  "empty",
+			Value: "f",
+			Usage: "empty bucket(s) or not (f/t)",
 		},
 
 		cli.StringFlag{

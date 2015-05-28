@@ -107,7 +107,7 @@ func action() func(c *cli.Context) {
 
 		mgo, err := db.NewMongoDB(mgoConfig)
 		if err != nil {
-			glog.Fatal(fmt.Sprintf("Init mysql connection failed with error: %v\n", err))
+			glog.Fatal(fmt.Sprintf("Init mgo connection failed with error: %v\n", err))
 		}
 
 		defer mgo.Close()
