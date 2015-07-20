@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"bytes"
 	alioss "github.com/PinIdea/oss-aliyun-go"
 	"github.com/lewgun/mfdc/uuid"
 )
@@ -221,6 +222,7 @@ func (oss *AliYun) WriteFile(name string, src multipart.File, size int) (string,
 
 }
 
+//UploadFile copy opend file to oss.
 func (oss *AliYun) UploadFile(name string, src *os.File) (string, error) {
 	if name == "" || src == nil {
 		return "", fmt.Errorf("Illegal parameter.")
@@ -235,6 +237,36 @@ func (oss *AliYun) UploadFile(name string, src *os.File) (string, error) {
 	stats, err := src.Stat()
 
 	parts, err := multi.PutAll(src, stats.Size())
+	if err != nil {
+		return "", err
+	}
+
+	if err = multi.Complete(parts); err != nil {
+		return "", err
+	}
+
+	_, err = oss.uploadMeta(uuid, name)
+	if err != nil {
+		oss.DeleteFile(uuid)
+		return "", err
+	}
+
+	return uuid, nil
+}
+
+//WriteBytes write bytes to oss.
+func (oss *AliYun) WriteBytes(name string, src *bytes.Reader) (string, error) {
+	if name == "" {
+		return "", fmt.Errorf("Illegal parameter.")
+	}
+
+	uuid := uuid.New()
+
+	bucket := oss.Bucket(MFSDKBinariesBucket)
+
+	multi, err := bucket.InitMulti(uuid, "application/octet-stream", alioss.PublicRead)
+
+	parts, err := multi.PutAll(src, int64(src.Len()))
 	if err != nil {
 		return "", err
 	}
