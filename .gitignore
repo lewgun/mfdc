@@ -4,7 +4,7 @@
 *.so
 *.exe
 *.iml
-config.json
+
 
 # Folders
 _obj

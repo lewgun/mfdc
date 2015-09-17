@@ -1,0 +1,31 @@
+{
+  "stores": {
+    "googleplay": {
+      "power_on":        true,
+      "http_proxy":      true,
+      "client_id":       "",
+      "client_secret":   "",
+      "refresh_token":   "",
+      "url":             "https://www.googleapis.com/androidpublisher/v2/applications"
+    },
+
+    "appstore": {
+      "power_on":    true,
+      "http_proxy":  true,
+      "debug":       false,
+      "debug_url":   "https://sandbox.itunes.apple.com/verifyReceipt",
+      "release_url": ""
+    }
+  },
+
+  "host": {
+    "port": "8080"
+  },
+
+  "proxy": {
+    "all_on":   true,
+    "address": "http://192.168.6.72:1080"
+
+  }
+
+}
