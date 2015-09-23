@@ -4,54 +4,95 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
 
 	"overseaagent/pkg/config"
 )
 
+const (
+	receiptData   = "receipt-data"
+	transactionID = "transactionId"
+)
+
+const (
+	statusSandbox = 21007 //sandbox 模式
+)
+
 func (s *Store) appStore(w http.ResponseWriter, req *http.Request) {
 
-	s.setProxyEnv(config.APP_STORE)
-	defer s.UnsetProxyEnv()
+	m, err := requiredParams(req, receiptData /*, TRANSACTION_ID*/) //暂未使用
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
-	req.ParseForm()
-	err := s.auth(w, req)
+	err = s.auth(w, req)
 	if err != nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	as := &s.config.Stores.AppStore
-
-	url := as.ReleaseURL
-	if as.Debug {
-		url = as.DebugURL
-	}
-
-	m := map[string]string{
-		"receipt-data": req.FormValue("receipt-data"),
-	}
+	s.setProxyEnv(config.StoreApple)
+	defer s.UnsetProxyEnv()
 
 	data, err := json.Marshal(m)
-	if err != nil {
+	r := bytes.NewReader(data)
 
+	//返回状态检测,只读取部分应答字段
+	var rspnStub struct {
+		Status int `json:"status`
 	}
 
+	as := &s.config.Stores.AppStore
+	url := as.ReleaseURL
+
+	var result bool
+	for {
+		r.Seek(0, os.SEEK_SET)
+		data, err = s.appStorePOST(url, r) //首选release模式,如果出现21007错误,则再次尝试sandbox模式
+		if err != nil {
+			fmt.Println(err)
+			http.Error(w, "internal error ", http.StatusInternalServerError)
+			return
+		}
+
+		err = json.Unmarshal(data, &rspnStub)
+		if err != nil {
+			http.Error(w, "internal error ", http.StatusInternalServerError)
+			return
+		}
+
+		if rspnStub.Status == statusSandbox {
+			url = as.DebugURL
+			continue //retry with sandbox url.
+		}
+
+		if rspnStub.Status == statusOK {
+			result = true
+		}
+
+		break
+	}
+
+	s.response(w, req, result, data)
+
+}
+
+//appStorePOST Http POST to appstore for verify.
+func (s *Store) appStorePOST(url string, r io.Reader) ([]byte, error) {
 	rspn, err := http.Post(url,
 		"application/json",
-		bytes.NewReader(data))
+		r)
 
 	if err != nil {
-		fmt.Println(err)
-		http.Error(w, "Internal error", http.StatusInternalServerError)
-		return
+		return nil, err
 	}
 
 	defer rspn.Body.Close()
 
-	data, err = ioutil.ReadAll(rspn.Body)
-
-	s.responseJSON(w, req, data)
+	return ioutil.ReadAll(rspn.Body)
 
 }

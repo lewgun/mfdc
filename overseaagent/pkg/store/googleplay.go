@@ -2,7 +2,7 @@ package store
 
 import (
 	"bytes"
-	"errors"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -17,42 +17,26 @@ import (
 )
 
 const (
-	PACKAGE_NAME = "packageName"
-	PRODUCT_ID   = "productId"
-	TOKEN        = "token"
+	packageName      = "packageName"
+	productID        = "productId"
+	token            = "token"
+	developerPayload = "developerPayload"
 )
 
 const (
 	AndroidpublisherScope = "https://www.googleapis.com/auth/androidpublisher"
 )
 
-var (
-	ErrMissingParam = errors.New("missing parameter(s).")
-)
-
-func requiredParams(req *http.Request, params ...string) (map[string]string, error) {
-
-	m := make(map[string]string)
-
-	for _, p := range params {
-		m[p] = req.FormValue(p)
-		if m[p] == "" {
-			return nil, ErrMissingParam
-		}
-	}
-	return m, nil
-}
-
 func playIAPUrl(base string, params map[string]string) string {
 	urlBuf := bytes.NewBufferString(base)
 	if !strings.HasSuffix(base, "/") {
 		urlBuf.WriteString("/")
 	}
-	urlBuf.WriteString(params[PACKAGE_NAME] + "/")
+	urlBuf.WriteString(params[packageName] + "/")
 	urlBuf.WriteString("purchases/products/")
-	urlBuf.WriteString(params[PRODUCT_ID] + "/")
+	urlBuf.WriteString(params[productID] + "/")
 	urlBuf.WriteString("tokens/")
-	urlBuf.WriteString(params[TOKEN])
+	urlBuf.WriteString(params[token])
 
 	return urlBuf.String()
 }
@@ -74,8 +58,11 @@ var g_Once sync.Once
 
 func (s *Store) googlePlay(w http.ResponseWriter, req *http.Request) {
 
-	s.setProxyEnv(config.GOOGLE_PLAY)
-	defer s.UnsetProxyEnv()
+	m, err := requiredParams(req, packageName, productID, token, developerPayload)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	var oauthClient *http.Client
 
@@ -87,18 +74,14 @@ func (s *Store) googlePlay(w http.ResponseWriter, req *http.Request) {
 		)
 	})
 
-	req.ParseForm()
-	err := s.auth(w, req)
+	err = s.auth(w, req)
 	if err != nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	m, err := requiredParams(req, PACKAGE_NAME, PRODUCT_ID, TOKEN)
-	if err != nil {
-		http.Error(w, "Internal error", http.StatusInternalServerError)
-		return
-	}
+	s.setProxyEnv(config.StoreGoogle)
+	defer s.UnsetProxyEnv()
 
 	url := playIAPUrl(s.config.Stores.GooglePlay.URL, m)
 
@@ -106,7 +89,6 @@ func (s *Store) googlePlay(w http.ResponseWriter, req *http.Request) {
 
 	rspn, err := oauthClient.Do(r)
 	if err != nil {
-		fmt.Println(err)
 		http.Error(w, "Internal error", http.StatusInternalServerError)
 		return
 	}
@@ -114,7 +96,25 @@ func (s *Store) googlePlay(w http.ResponseWriter, req *http.Request) {
 	defer rspn.Body.Close()
 
 	data, err := ioutil.ReadAll(rspn.Body)
+	fmt.Println(string(data))
 
-	s.responseJSON(w, req, data)
+	//返回状态检测,只读取部分应答字段
+	var rspnStub struct {
+		PurchaseState    int    `json:"purchaseState`
+		DeveloperPayload string `jsong:"developerPayload"`
+	}
+
+	err = json.Unmarshal(data, &rspnStub)
+	if err != nil {
+		http.Error(w, "internal error ", http.StatusInternalServerError)
+		return
+	}
+
+	var result bool
+	if rspnStub.DeveloperPayload == m[developerPayload] && rspnStub.PurchaseState == statusOK {
+		result = true
+	}
+
+	s.response(w, req, result, data)
 
 }

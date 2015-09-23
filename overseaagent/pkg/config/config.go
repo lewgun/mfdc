@@ -17,9 +17,9 @@ func (s StoreType) String() string {
 }
 
 const (
-	GOOGLE_PLAY StoreType = "googleplay"
-	APP_STORE   StoreType = "appstore"
-	ALL_STORE   StoreType = "allstore"
+	StoreGoogle StoreType = "google"
+	StoreApple  StoreType = "apple"
+	StoreAll    StoreType = "storeall"
 )
 
 var (
@@ -27,7 +27,6 @@ var (
 )
 
 type AppStore struct {
-	Debug       bool `json:"debug"`
 	HTTPProxyOn bool `json:"http_proxy"`
 	PowerOn     bool `json:"power_on"`
 
@@ -37,16 +36,7 @@ type AppStore struct {
 
 func (as *AppStore) String() string {
 	buf := &bytes.Buffer{}
-	buf.WriteString("IsDebug: ")
 
-	if as.Debug {
-		buf.WriteString("true")
-
-	} else {
-		buf.WriteString("false")
-	}
-
-	buf.WriteString("\t")
 	buf.WriteString("DebugURL: " + as.DebugURL + "\t")
 	buf.WriteString("ReleaseURL: " + as.ReleaseURL)
 
@@ -167,18 +157,17 @@ type Config struct {
 
 func (c *Config) String() string {
 	buf := &bytes.Buffer{}
-
 	buf.WriteString("Stores:")
 
 	gp := &c.Stores.GooglePlay
 	buf.WriteString("\n\t")
-	buf.WriteString(GOOGLE_PLAY.String())
+	buf.WriteString(StoreGoogle.String())
 	buf.WriteString(":\t")
 	buf.WriteString(gp.String())
 
 	as := &c.Stores.AppStore
 	buf.WriteString("\n\t")
-	buf.WriteString(APP_STORE.String())
+	buf.WriteString(StoreApple.String())
 	buf.WriteString(":\t")
 	buf.WriteString(as.String())
 
@@ -244,14 +233,13 @@ func (c *Config) check() error {
 	//App Store
 	as := &c.Stores.AppStore
 	if as.PowerOn {
-		if as.Debug {
-			if as.DebugURL == "" {
-				return fmt.Errorf("APP Store's settings are not finished.")
-			}
-		} else {
-			if as.ReleaseURL == "" {
-				return fmt.Errorf("APP Store's settings are not finished.")
-			}
+
+		if as.DebugURL == "" {
+			return fmt.Errorf("APP Store's settings are not finished.")
+		}
+
+		if as.ReleaseURL == "" {
+			return fmt.Errorf("APP Store's settings are not finished.")
 		}
 
 	}

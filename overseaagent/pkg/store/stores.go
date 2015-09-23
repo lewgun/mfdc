@@ -2,14 +2,39 @@
 package store
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
 	"overseaagent/pkg/config"
-
-	"fmt"
 )
+
+const (
+	store = "store"
+)
+
+const (
+	statusOK = 0
+)
+
+//ErrMissingParam missing required parameter(s) error.
+type ErrMissingParam []string
+
+//Append add a missing parameter
+func (e *ErrMissingParam) Append(param string) {
+	*e = append(*e, param)
+}
+
+func (e *ErrMissingParam) String() string {
+	return strings.Join(*e, ", ")
+}
+
+func (e *ErrMissingParam) Error() string {
+	return fmt.Sprintf("missing parameter(s): ( %s )", e.String())
+}
 
 //HandlerFunc 消息处理handler
 type HandlerFunc func(p *Store, w http.ResponseWriter, r *http.Request)
@@ -19,9 +44,51 @@ func UNUSED(...interface{}) {}
 
 //g_handlerMap handler map
 var g_handlerMap = map[string]HandlerFunc{
-	"/":           (*Store).index,
-	"/googleplay": (*Store).googlePlay,
-	"/appstore":   (*Store).appStore,
+	"google": (*Store).googlePlay,
+	"apple":  (*Store).appStore,
+}
+
+func requiredParams(req *http.Request, params ...string) (map[string]string, error) {
+	m := make(map[string]string)
+
+	errs := &ErrMissingParam{}
+
+	for _, p := range params {
+		m[p] = req.FormValue(p)
+		if m[p] == "" {
+			errs.Append(p)
+		}
+	}
+
+	if len(*errs) != 0 {
+		return nil, errs
+	}
+
+	return m, nil
+}
+
+//Response response to client.
+type Response struct {
+	Result bool   `json:"result"`
+	Data   []byte `json:"data"`
+}
+
+func (r *Response) MarshalJSON() ([]byte, error) {
+	buf := &bytes.Buffer{}
+
+	buf.WriteString(`{"result": `)
+	if r.Result {
+		buf.WriteString("true")
+	} else {
+		buf.WriteString("false")
+	}
+	buf.WriteString(",")
+	buf.WriteString(`"data": `)
+	buf.Write(r.Data)
+	buf.WriteString("}")
+
+	return buf.Bytes(), nil
+
 }
 
 //Store 所有商店的基础结构
@@ -38,15 +105,15 @@ func (s *Store) setProxyEnv(typ config.StoreType) {
 	}
 
 	//设置全局代理
-	if typ == config.ALL_STORE && s.config.Proxy.AllOn {
+	if typ == config.StoreAll && s.config.Proxy.AllOn {
 		s.globalProxyOn = true
 		os.Setenv("HTTP_PROXY", s.config.Proxy.Address)
 		return
 	}
 
 	//分商店设置代理
-	if (typ == config.APP_STORE && s.config.Stores.AppStore.HTTPProxyOn) ||
-		(typ == config.GOOGLE_PLAY && s.config.Stores.GooglePlay.HTTPProxyOn) {
+	if (typ == config.StoreApple && s.config.Stores.AppStore.HTTPProxyOn) ||
+		(typ == config.StoreGoogle && s.config.Stores.GooglePlay.HTTPProxyOn) {
 		os.Setenv("HTTP_PROXY", s.config.Proxy.Address)
 	}
 
@@ -71,12 +138,13 @@ func (s *Store) auth(w http.ResponseWriter, req *http.Request) error {
 }
 
 //Response 向客户端的消息响应
-func (s *Store) response(w http.ResponseWriter, req *http.Request, data interface{}) {
-	jsonText, err := json.Marshal(data)
-	UNUSED(err)
-
-	n, err := w.Write(jsonText)
-	UNUSED(n)
+func (s *Store) response(w http.ResponseWriter, req *http.Request, result bool, data []byte) {
+	resp := Response{
+		Result: result,
+		Data:   data,
+	}
+	rspn, _ := json.Marshal(&resp)
+	s.responseJSON(w, req, rspn)
 }
 
 //Response 向客户端的消息响应
@@ -85,24 +153,18 @@ func (s *Store) responseJSON(w http.ResponseWriter, req *http.Request, jsonText 
 }
 
 func (p *Store) dispatch(path string, w http.ResponseWriter, r *http.Request) {
-	if fn, ok := g_handlerMap[path]; ok {
-		fn(p, w, r)
-	} else {
-		http.NotFound(w, r)
-	}
 
-}
+	r.ParseForm()
 
-func (s *Store) index(w http.ResponseWriter, req *http.Request) {
-	err := s.auth(w, req)
-	if err != nil {
+	m, err := requiredParams(r, store)
+	if err != nil || (m[store] != string(config.StoreApple) && m[store] != string(config.StoreGoogle)) {
+
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
+
+	} else {
+		g_handlerMap[m[store]](p, w, r)
 	}
-
-	//todo. do something real here
-	var data interface{} = "pls send your request to /googleplay or /appstore."
-
-	s.response(w, req, data)
 
 }
 
@@ -119,6 +181,6 @@ func New(c *config.Config) *Store {
 	}
 
 	//若有必要 开启全局代理
-	s.setProxyEnv(config.ALL_STORE)
+	s.setProxyEnv(config.StoreAll)
 	return s
 }
