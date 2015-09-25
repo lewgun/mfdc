@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 
 	"overseaagent/pkg/config"
@@ -97,38 +96,6 @@ type Store struct {
 	globalProxyOn bool //全局代理
 }
 
-//setProxyEnv 设置http代理
-func (s *Store) setProxyEnv(typ config.StoreType) {
-
-	if s.globalProxyOn {
-		return
-	}
-
-	//设置全局代理
-	if typ == config.StoreAll && s.config.Proxy.AllOn {
-		s.globalProxyOn = true
-		os.Setenv("HTTP_PROXY", s.config.Proxy.Address)
-		return
-	}
-
-	//分商店设置代理
-	if (typ == config.StoreApple && s.config.Stores.AppStore.HTTPProxyOn) ||
-		(typ == config.StoreGoogle && s.config.Stores.GooglePlay.HTTPProxyOn) {
-		os.Setenv("HTTP_PROXY", s.config.Proxy.Address)
-	}
-
-}
-
-//取消http代理
-func (s *Store) UnsetProxyEnv() {
-
-	if s.globalProxyOn {
-		return
-	}
-
-	os.Unsetenv("HTTP_PROXY")
-}
-
 //Auth 权限认证
 func (s *Store) auth(w http.ResponseWriter, req *http.Request) error {
 
@@ -180,7 +147,5 @@ func New(c *config.Config) *Store {
 		config: c,
 	}
 
-	//若有必要 开启全局代理
-	s.setProxyEnv(config.StoreAll)
 	return s
 }

@@ -8,8 +8,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-
-	"overseaagent/pkg/config"
 )
 
 const (
@@ -34,9 +32,6 @@ func (s *Store) appStore(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-
-	s.setProxyEnv(config.StoreApple)
-	defer s.UnsetProxyEnv()
 
 	data, err := json.Marshal(m)
 	r := bytes.NewReader(data)
@@ -83,7 +78,12 @@ func (s *Store) appStore(w http.ResponseWriter, req *http.Request) {
 
 //appStorePOST Http POST to appstore for verify.
 func (s *Store) appStorePOST(url string, r io.Reader) ([]byte, error) {
-	rspn, err := http.Post(url,
+
+	c := &http.Client{
+		Transport: newTransport(s.config),
+	}
+
+	rspn, err := c.Post(url,
 		"application/json",
 		r)
 

@@ -3,7 +3,6 @@ package store
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -41,20 +40,21 @@ func playIAPUrl(base string, params map[string]string) string {
 	return urlBuf.String()
 }
 
-func oauthHTTPClient(clientID, clientSecret, refreshToken string) *http.Client {
+func oauthHTTPClient(conf *config.Config) *http.Client {
 
-	oAuthClient := oauth2.NewClient(oauth2.NoContext, oauthutil.NewRefreshTokenSource(&oauth2.Config{
+	c := oauth2.NewClient(oauth2.NoContext, oauthutil.NewRefreshTokenSource(&oauth2.Config{
 		Scopes:       []string{AndroidpublisherScope},
 		Endpoint:     google.Endpoint,
-		ClientID:     clientID,
-		ClientSecret: clientSecret,
+		ClientID:     conf.Stores.GooglePlay.ClientID,
+		ClientSecret: conf.Stores.GooglePlay.ClientSecret,
 		RedirectURL:  oauthutil.TitleBarRedirectURL,
-	}, refreshToken))
+	}, conf.Stores.GooglePlay.RefreshToken))
 
-	return oAuthClient
+	return c
 }
 
-var g_Once sync.Once
+var oauthClientOnce sync.Once
+var oauthClient *http.Client
 
 func (s *Store) googlePlay(w http.ResponseWriter, req *http.Request) {
 
@@ -64,39 +64,33 @@ func (s *Store) googlePlay(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	var oauthClient *http.Client
-
-	g_Once.Do(func() {
-		oauthClient = oauthHTTPClient(
-			s.config.Stores.GooglePlay.ClientID,
-			s.config.Stores.GooglePlay.ClientSecret,
-			s.config.Stores.GooglePlay.RefreshToken,
-		)
-	})
-
 	err = s.auth(w, req)
 	if err != nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	s.setProxyEnv(config.StoreGoogle)
-	defer s.UnsetProxyEnv()
+	oauthClientOnce.Do(func() {
+		oauthClient = oauthHTTPClient(s.config)
+	})
 
 	url := playIAPUrl(s.config.Stores.GooglePlay.URL, m)
 
 	r, err := http.NewRequest("GET", url, nil)
 
-	rspn, err := oauthClient.Do(r)
+	cx := &http.Client{
+		Transport: newTransport(s.config),
+	}
+	rspn, err := cx.Do(r)
+	//rspn, err := oauthClient.Do(r)
 	if err != nil {
-		http.Error(w, "Internal error", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	defer rspn.Body.Close()
 
 	data, err := ioutil.ReadAll(rspn.Body)
-	fmt.Println(string(data))
 
 	//返回状态检测,只读取部分应答字段
 	var rspnStub struct {
