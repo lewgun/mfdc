@@ -79,11 +79,7 @@ func (s *Store) appStore(w http.ResponseWriter, req *http.Request) {
 //appStorePOST Http POST to appstore for verify.
 func (s *Store) appStorePOST(url string, r io.Reader) ([]byte, error) {
 
-	c := &http.Client{
-		Transport: newTransport(s.config),
-	}
-
-	rspn, err := c.Post(url,
+	rspn, err := http.Post(url,
 		"application/json",
 		r)
 

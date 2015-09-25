@@ -78,11 +78,7 @@ func (s *Store) googlePlay(w http.ResponseWriter, req *http.Request) {
 
 	r, err := http.NewRequest("GET", url, nil)
 
-	cx := &http.Client{
-		Transport: newTransport(s.config),
-	}
-	rspn, err := cx.Do(r)
-	//rspn, err := oauthClient.Do(r)
+	rspn, err := oauthClient.Do(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

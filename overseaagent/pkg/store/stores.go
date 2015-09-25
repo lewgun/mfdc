@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 
 	"overseaagent/pkg/config"
@@ -104,6 +105,34 @@ func (s *Store) auth(w http.ResponseWriter, req *http.Request) error {
 
 }
 
+//setProxy 代理设置
+//
+// 可以通过为http.Client.Transport.Proxy设置不同回调来达到类似效果
+func (s *Store) setProxy() (err error) {
+
+	if s.config.Proxy.Address == "" {
+		return
+	}
+	os.Setenv("HTTP_PROXY", s.config.Proxy.Address)
+
+	//全局代理
+	if s.config.Proxy.AllOn {
+		return
+	}
+
+	//添加不需要代理的host
+	var np noProxys
+	if !s.config.Stores.AppStore.HTTPProxyOn {
+		np.append(rootAPPStore)
+	}
+	if !s.config.Stores.GooglePlay.HTTPProxyOn {
+		np.append(rootGooglePlay)
+	}
+
+	np.set()
+	return
+}
+
 //Response 向客户端的消息响应
 func (s *Store) response(w http.ResponseWriter, req *http.Request, result bool, data []byte) {
 	resp := Response{
@@ -146,6 +175,8 @@ func New(c *config.Config) *Store {
 	s := &Store{
 		config: c,
 	}
+
+	s.setProxy()
 
 	return s
 }
